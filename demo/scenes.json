@@ -1,0 +1,88 @@
+[
+  {
+    "title": "The discount that would not die",
+    "card": ["REPAIR COMPLETED", "MEMORY STILL WRONG", "A controlled demonstration of false success"],
+    "narration": "Imagine a sales assistant remembering a twenty percent discount. The offer is withdrawn. A repair reports completion. But the saved summary still contains the discount. Nothing crashes. The memory is simply wrong. This is Fallout: failure aware lineage and memory repair for AI agents. This video uses edited captures of real local browser runs, with synthetic narration. The scenarios and injected failures are deliberate demonstrations."
+  },
+  {
+    "title": "Remembering is only half the problem",
+    "card": ["Agents retain notes and summaries", "What happens when their sources are withdrawn?", "Industry context: Anthropic memory-tool announcement", "September 29, 2025 — not breaking news"],
+    "source": "https://claude.com/blog/context-management",
+    "narration": "Agents increasingly retain information across tasks. Anthropic's September twenty ninth, twenty twenty five, memory tool announcement is one example of that shift. This is industry context, not a claim that Anthropic experienced this particular failure. Fallout asks a narrower question: when a source is withdrawn, can we repair its dependent memory and independently prove that the saved state is consistent?"
+  },
+  {
+    "title": "01 / Pricing: inspect the evidence",
+    "image": "story-pricing-01-idle.png",
+    "narration": "Start in Overview with Pricing withdrawal selected. The graph connects sources to facts, and facts to a saved summary. The sales offer supports phone support and a discount. Phone support also has independent evidence from the pricing sheet. Clicking a node only inspects it. It never authorizes a repair."
+  },
+  {
+    "title": "Preview first. Change nothing.",
+    "image": "story-pricing-03-preview-top.png",
+    "narration": "In Repair, select sales and click Preview changes. One fact retains support. One loses support. One summary needs rebuilding. Amber shows the proposed impact, not a completed repair. Phone support should stay. The discount should leave usable memory. This preview does not mutate the dataset."
+  },
+  {
+    "title": "Deliberately inject false success",
+    "image": "story-pricing-02-preview.png",
+    "narration": "For this test, open Verify, then Advanced, fault injection. Choose Skip one rebuild but report completion. Return to Repair and preview sales. Only then click Confirm removal and repair. That click explicitly authorizes the withdrawal. Verification runs automatically afterward. We are deliberately testing the completion claim, not hiding an accidental failure."
+  },
+  {
+    "title": "The operation says done. The verifier says FAIL.",
+    "image": "story-pricing-04-fail-top.png",
+    "narration": "Here is the actual result. The operation reports completion, but independent verification fails. The discount has lost its supporting source. The summary rebuild was skipped. A completed workflow is not the same thing as correct saved memory."
+  },
+  {
+    "title": "The exact stale content",
+    "image": "story-pricing-05-exact-mismatch.png",
+    "narration": "Look at expected versus actual. The independent reference contains only: Phone support is available. The recorded summary still contains: A twenty percent discount is available. This is an exact content mismatch, not an AI opinion. The verifier reconstructs expected state from the original dataset and withdrawal history, rather than trusting the repair's completion message."
+  },
+  {
+    "title": "Recover the same operation",
+    "image": "story-pricing-06-recovery-top.png",
+    "narration": "In Verify, click Retry repair without a mistake. There is no reset and no replacement operation. A clean retry rebuilds the saved summary, and a fresh independent check passes. The earlier failure remains part of the session's history."
+  },
+  {
+    "title": "A retry, not a fresh start",
+    "image": "story-pricing-07-recovered-operation.png",
+    "narration": "The browser checks confirm that the failed and recovered records have the same operation identifier, and that the attempt count increased by one. Recovery advances the revision and receives its own verification. This is session local history, not an immutable or permanently stored audit log."
+  },
+  {
+    "title": "02 / Technical documentation",
+    "image": "story-documentation-01-idle.png",
+    "narration": "Now select Technical documentation withdrawal. Same engine, different dataset. An archived bulletin supports cursor pagination and legacy query string access tokens. The API reference independently supports pagination and a rate limit. A separate installation guide supports the Python requirement."
+  },
+  {
+    "title": "Two affected summaries. One untouched.",
+    "image": "story-documentation-03-preview-top.png",
+    "narration": "In Repair, select obsolete bulletin and click Preview changes. Pagination retains independent support. The legacy token claim loses its only source. API overview and migration notes need rebuilding. The installation summary is outside this affected set. Withdrawal is explicit: the application does not infer that a newer document automatically overrides an older one."
+  },
+  {
+    "title": "The same fault, in a different domain",
+    "image": "story-documentation-05-exact-mismatch.png",
+    "narration": "This recording repeats the controlled false success test in documentation too. After explicit approval, one summary rebuild is skipped while the operation reports completion. The independent checker catches the legacy token text that remains in API overview. Reusing the same test in another dataset demonstrates that the check is not special cased for a discount."
+  },
+  {
+    "title": "Documentation recovered",
+    "image": "story-documentation-06-recovery-top.png",
+    "narration": "Click Retry repair without a mistake. A fresh check now passes for the same operation. API overview keeps pagination and the rate limit. Migration notes keeps pagination. The unsupported legacy token claim is absent from both repaired summaries. The browser also checks that the entire installation summary record remains unchanged, including its build count."
+  },
+  {
+    "title": "Evidence from this actual run",
+    "evidence": true,
+    "narration": "These identifiers and comparison totals come from the captured run's verification reports. In both scenarios, the saved content produced a real failure before recovery and a real pass afterward. The counts are executed comparisons, not a performance benchmark. The evidence bundle contains both reports and both operation records."
+  },
+  {
+    "title": "AI explains. It does not decide correctness.",
+    "card": ["Optional Gemini assistance", "Explicit consent before each request", "Engine repairs • independent verifier checks", "No live AI request is included in this recording"],
+    "narration": "The application also supports optional Gemini explanations. Open AI assistance, choose Explain a memory's sources, select a memory, give consent, and request assistance. Generated language is not verified evidence. This recording used the isolated AI disabled preview and contains no live Gemini request. Your working AI session was not touched."
+  },
+  {
+    "title": "Implemented, with explicit boundaries",
+    "card": ["Python repair engine + independent reconstruction", "Streamlit workbench + local SVG graph", "Two fixtures, one reusable repair implementation", "Local in-memory prototype • synthetic datasets", "Consistency with evidence, not real-world truth"],
+    "narration": "The implementation separates the Python repair engine, the independent verifier, and the recorded memory comparison. A Streamlit workbench presents the evidence with a local SVG graph. Both scenarios use the same repair implementation. This is a local, in memory prototype with synthetic datasets. A pass establishes consistency with the recorded evidence. It does not establish real world truth or solve every possible agent failure."
+  },
+  {
+    "title": "Do not trust the completion message",
+    "card": ["TRACE → REPAIR → VERIFY → RECOVER", "Verify the memory.", "FALLOUT"],
+    "narration": "We withdrew a sales offer without losing independently supported information. We caught false completion, recovered the same operation, and repeated the proof in technical documentation while preserving unrelated memory. Fallout. Do not trust the completion message. Verify the memory."
+  }
+]

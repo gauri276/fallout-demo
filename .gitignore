@@ -1,0 +1,20 @@
+# Keep local configuration, credentials, and generated artifacts out of Git.
+.env
+.env.*
+.venv/
+.tmp/
+.runtime/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.DS_Store
+*.log
+.streamlit/secrets.toml
+.vscode/
+*.m4a
+*.mp4
+*.wav
+*.aiff
+*.zip

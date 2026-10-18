@@ -1,0 +1,18 @@
+services:
+  falkordb:
+    image: falkordb/falkordb@sha256:7927eb194df0fadf70e2deb6c20c8178743ec92aacd739c790f8a35ce5dee613
+    entrypoint: ["redis-server"]
+    # AOF replay crashed with parameterized graph writes on the tested image.
+    # Use tested RDB snapshots; recent unsaved writes are not crash-durable.
+    command: ["--loadmodule", "/var/lib/falkordb/bin/falkordb.so", "--dir", "/data", "--appendonly", "no", "--save", "60 1"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - fallout_graph_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+volumes:
+  fallout_graph_data:

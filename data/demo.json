@@ -1,0 +1,13 @@
+{
+  "sources": [
+    {"id": "pricing", "text": "Synthetic pricing sheet: phone support is available."},
+    {"id": "sales", "text": "Synthetic sales offer: phone support and a 20% discount are available."}
+  ],
+  "facts": [
+    {"id": "phone_support", "text": "Phone support is available.", "sources": ["pricing", "sales"]},
+    {"id": "discount_20", "text": "A 20% discount is available.", "sources": ["sales"]}
+  ],
+  "summaries": [
+    {"id": "customer_summary", "facts": ["phone_support", "discount_20"]}
+  ]
+}

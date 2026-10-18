@@ -1,0 +1,18 @@
+{
+  "sources": [
+    {"id": "obsolete_bulletin", "text": "Synthetic API bulletin (v1, archived): cursor pagination is supported; legacy query-string access tokens are accepted."},
+    {"id": "api_reference", "text": "Synthetic API reference (v2): independently documents cursor pagination and a limit of 100 requests per minute."},
+    {"id": "installation_guide", "text": "Synthetic installation guide (edition 2026): installation requires Python 3.11 or later."}
+  ],
+  "facts": [
+    {"id": "cursor_pagination", "text": "Cursor pagination is supported.", "sources": ["obsolete_bulletin", "api_reference"]},
+    {"id": "legacy_query_tokens", "text": "Legacy query-string access tokens are accepted.", "sources": ["obsolete_bulletin"]},
+    {"id": "rate_limit", "text": "The API allows 100 requests per minute.", "sources": ["api_reference"]},
+    {"id": "python_requirement", "text": "Installation requires Python 3.11 or later.", "sources": ["installation_guide"]}
+  ],
+  "summaries": [
+    {"id": "api_overview", "facts": ["cursor_pagination", "legacy_query_tokens", "rate_limit"]},
+    {"id": "migration_notes", "facts": ["cursor_pagination", "legacy_query_tokens"]},
+    {"id": "installation_summary", "facts": ["python_requirement"]}
+  ]
+}

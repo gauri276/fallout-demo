@@ -1,0 +1,1 @@
+"""Local tests; no database or external-service access."""

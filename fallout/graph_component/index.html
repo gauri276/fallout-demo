@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memory lineage graph</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; color: #E8EDE9; background: #171C1A; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #171C1A; }
+    main { border: 1px solid #46534C; border-radius: 10px; overflow: hidden; }
+    .toolbar, #camera { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .toolbar { padding: 10px 12px; background: #202824; border-bottom: 1px solid #46534C; }
+    #camera { margin-left: auto; }
+    button { border: 1px solid #65786B; border-radius: 5px; background: #28342D; color: #E8EDE9; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; min-height: 40px; }
+    button:hover:not(:disabled) { background: #35473B; border-color: #B3E4B7; }
+    button[aria-pressed="true"] { border-color: #B3E4B7; box-shadow: inset 0 -2px #B3E4B7; }
+    button:disabled { opacity: .45; cursor: default; }
+    button:focus-visible, summary:focus-visible, #viewport:focus-visible { outline: 3px solid #B3E4B7; outline-offset: -3px; }
+    #zoom { font-size: 12px; font-variant-numeric: tabular-nums; }
+    #viewport { position: relative; width: 100%; height: 480px; min-height: 480px; overflow: auto; background: #171C1A; scrollbar-color: #65786B #171C1A; }
+    svg { display: block; background: #171C1A; }
+    #empty { padding: 32px 20px; margin: 0; color: #A9B5AE; font-size: 15px; }
+    [hidden] { display: none !important; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 10px 14px; color: #A9B5AE; font-size: 13px; border-top: 1px solid #46534C; }
+    .legend > span { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch { display: inline-block; width: 11px; height: 11px; border: 1px solid #A9B5AE; background: #303D35; }
+    .circle { border-radius: 50%; } .diamond { transform: rotate(45deg); }
+    .impact { border: 2px solid #D5AE65; background: none; border-radius: 50%; }
+    .selected { border: 2px solid #B3E4B7; background: none; border-radius: 50%; }
+    .mismatch { background: #51312F; border-color: #E49B96; }
+    .inactive { width: 18px; height: 0; border: 0; border-top: 2px dashed #A9B5AE; }
+    details { padding: 10px 14px; border-top: 1px solid #46534C; color: #A9B5AE; font-size: 13px; line-height: 1.6; }
+    summary { cursor: pointer; color: #E8EDE9; min-height: 32px; }
+    details p { margin: 8px 0; }
+    #relationships { padding: 14px; overflow-wrap: anywhere; }
+    #relationships > p { margin: 0 0 12px; color: #A9B5AE; font-size: 13px; }
+    table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 13px; }
+    caption { text-align: left; color: #E8EDE9; font-size: 15px; font-weight: 600; padding-bottom: 12px; }
+    th, td { padding: 10px 6px; border-bottom: 1px solid #46534C; text-align: left; vertical-align: top; }
+    th { color: #A9B5AE; font-weight: 500; }
+    th:first-child { width: 48px; }
+    .entity-button { font-size: 15px; text-align: left; white-space: normal; overflow-wrap: anywhere; max-width: 100%; }
+    td .entity-button { padding: 6px; width: 100%; }
+    #entity-list { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+    #entity-list .entity-button span { display: block; color: #A9B5AE; font-size: 13px; }
+    .relationship-type, .edge-state { font-size: 13px; }
+    .edge-reference-number { font-size: 12px; }
+    #relationships.compact thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    #relationships.compact table, #relationships.compact tbody { display: block; }
+    #relationships.compact tr { display: grid; grid-template-columns: minmax(0, 1fr); border: 1px solid #46534C; border-radius: 6px; margin-bottom: 12px; padding: 8px; }
+    #relationships.compact td { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 8px; align-items: center; border: 0; padding: 4px; }
+    #relationships.compact td::before { content: attr(data-label); color: #A9B5AE; font-size: 13px; }
+    .node { cursor: pointer; outline: none; }
+    .node .halo { fill: none; stroke: transparent; stroke-width: 2; transition: stroke 140ms ease, stroke-width 140ms ease; }
+    @media (prefers-reduced-motion: reduce) {
+      .node .halo { transition: none; }
+    }
+    .node[data-affected="true"] .halo { stroke: #d5ae65; }
+    .node[aria-pressed="true"] .halo { stroke: #b3e4b7; stroke-width: 3; }
+    .node:hover .halo { stroke-width: 4; }
+    .node:focus-visible .focus-ring { stroke: #b3e4b7; stroke-width: 3; stroke-dasharray: 4 2; }
+    .focus-ring { fill: none; stroke: transparent; }
+    text { fill: #E8EDE9; font-family: system-ui, sans-serif; font-size: 15px; }
+    .label { font-weight: 600; }
+    .note, .support { fill: #A9B5AE; font-size: 13px; }
+    .edge-label { font-size: 12px; fill: #E8EDE9; }
+    .edge-chip { fill: #171C1A; stroke: #65786B; }
+    .heading { font-size: 13px; font-weight: 700; letter-spacing: 1px; fill: #A9B5AE; }
+    .lane-relation { font-size: 13px; fill: #A9B5AE; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="toolbar" role="group" aria-label="Lineage view">
+    <button id="graph-view" type="button" aria-controls="viewport" aria-pressed="true">Graph</button>
+    <button id="table-view" type="button" aria-controls="relationships" aria-pressed="false">Relationships</button>
+    <div id="camera" role="group" aria-label="Graph camera">
+      <button id="fit" type="button" disabled>Fit to view</button>
+      <button id="out" type="button" aria-label="Zoom out" disabled>−</button>
+      <button id="in" type="button" aria-label="Zoom in" disabled>+</button>
+      <output id="zoom" aria-live="polite">100%</output>
+    </div>
+  </div>
+  <div id="viewport" tabindex="0" role="region" aria-label="Scrollable memory lineage graph">
+    <p id="empty" role="status">Waiting for graph data.</p>
+    <svg id="graph" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Memory connections" hidden></svg>
+  </div>
+  <section id="relationships" aria-label="Relationship table" hidden>
+    <p>Numbered references match the graph. Select a source or target to inspect it; inactive relationships are retained.</p>
+    <table role="table">
+      <caption>Source → relationship → target</caption>
+      <thead role="rowgroup"><tr role="row"><th scope="col">Ref</th><th scope="col">Source</th><th scope="col">Relationship</th><th scope="col">Target</th><th scope="col">State</th></tr></thead>
+      <tbody id="relationship-rows" role="rowgroup"></tbody>
+    </table>
+    <p id="no-relationships" hidden>No relationships exist in this snapshot.</p>
+    <details id="entities"><summary>All entities · select to inspect</summary><div id="entity-list"></div></details>
+  </section>
+  <div class="legend" aria-label="Graph legend">
+    <span><i class="swatch" aria-hidden="true"></i>Source</span>
+    <span><i class="swatch circle" aria-hidden="true"></i>Fact</span>
+    <span><i class="swatch diamond" aria-hidden="true"></i>Summary</span>
+    <span><i class="swatch selected" aria-hidden="true"></i>Selected</span>
+    <span><i class="swatch impact" aria-hidden="true"></i>Preview impact</span>
+    <span><i class="swatch mismatch" aria-hidden="true"></i>Mismatch</span>
+  </div>
+  <details id="reading-help">
+    <summary>How to read this graph</summary>
+    <p>Arrows follow source → fact → summary. SUPPORTED_BY means source supports fact; COMPOSED_OF means fact contributes to summary. Each horizontal # reference identifies one edge in Relationships, which lists its full endpoints, type and state.</p>
+    <p>Dashed edges are retained but inactive. Amber outlines show a computed withdrawal preview; mint shows the entity being inspected. Inspection never changes the preview target. Ordinary invalid or revoked nodes stay neutral. Red is reserved for mismatches supplied by the verifier.</p>
+    <p>Select a node to reveal relationship lane names; select a fact to reveal its support counts. Shared support lists retained sources and counts active edges, not a verification verdict. Tab to a node; Enter or Space inspects it. Graph opens at native text size. Fit and zoom may shrink labels; scroll to pan when zoomed or viewing a large graph.</p>
+  </details>
+</main>
+<script>
+"use strict";
+(() => {
+  const NS = "http://www.w3.org/2000/svg"; // Namespace only; never fetched.
+  const svg = document.getElementById("graph");
+  const viewport = document.getElementById("viewport");
+  const empty = document.getElementById("empty");
+  const fit = document.getElementById("fit");
+  const zoomIn = document.getElementById("in");
+  const zoomOut = document.getElementById("out");
+  const zoomOutput = document.getElementById("zoom");
+  const main = document.querySelector("main");
+  const graphView = document.getElementById("graph-view");
+  const tableView = document.getElementById("table-view");
+  const relationships = document.getElementById("relationships");
+  const relationshipRows = document.getElementById("relationship-rows");
+  const entityList = document.getElementById("entity-list");
+  const measure = document.createElement("canvas").getContext("2d");
+  let payload = null, context = null, selected = null, serverSelected = null;
+  // Server/default selection is inspection state, not a disclosure action.
+  let activatedEntity = null;
+  let sequence = 0, scale = 1, cameraMode = "auto", width = 650, height = 480;
+  let lastWidth = 0, lastHeight = 0, disabled = false, viewChoice = null;
+  // A mobile parent may host a wider iframe. Cross-origin access is optional,
+  // never required: the component's own content width remains the fallback.
+  let parentMobile = null;
+  try {
+    if (window.parent !== window && window.parent.location.origin === window.location.origin) {
+      parentMobile = window.parent.matchMedia("(max-width: 599px)");
+    }
+  } catch (_) { /* Sandboxed/cross-origin embedding: use our own width. */ }
+
+  function availableWidth() { return Math.max(1, viewport.clientWidth || main.clientWidth); }
+  function compactView() { return availableWidth() < 600 || parentMobile?.matches === true; }
+  function updateView() {
+    const table = (viewChoice || (compactView() ? "table" : "graph")) === "table";
+    viewport.hidden = table;
+    relationships.hidden = !table;
+    relationships.classList.toggle("compact", compactView());
+    document.getElementById("camera").hidden = table;
+    graphView.setAttribute("aria-pressed", String(!table));
+    tableView.setAttribute("aria-pressed", String(table));
+  }
+
+  function send(type, fields = {}) {
+    window.parent.postMessage({isStreamlitMessage: true, type: "streamlit:" + type, ...fields}, "*");
+  }
+  function frameHeight() {
+    const next = Math.ceil(document.querySelector("main").getBoundingClientRect().height);
+    if (next !== lastHeight) { lastHeight = next; send("setFrameHeight", {height: next}); }
+  }
+  function element(tag, attributes = {}, text = null, parent = svg) {
+    const node = document.createElementNS(NS, tag);
+    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
+    if (text !== null) node.textContent = String(text);
+    parent.appendChild(node);
+    return node;
+  }
+  function wrap(text, maxWidth, size = 15, bold = false) {
+    // Wrap natural language at word boundaries; only split an overlong ID.
+    measure.font = `${bold ? "600 " : ""}${size}px system-ui, sans-serif`;
+    const lines = []; let line = "";
+    const fits = value => measure.measureText(value).width <= maxWidth - 4;
+    for (const word of String(text).split(/\s+/)) {
+      const joined = line ? line + " " + word : word;
+      if (fits(joined)) { line = joined; continue; }
+      if (line) { lines.push(line); line = ""; }
+      for (const character of word) {
+        if (line && !fits(line + character)) { lines.push(line); line = ""; }
+        line += character;
+      }
+    }
+    lines.push(line);
+    return lines;
+  }
+  function textLines(parent, lines, x, y, className = "", anchor = "middle", leading = 18) {
+    const text = element("text", {x, y, class: className, "text-anchor": anchor}, null, parent);
+    lines.forEach((line, index) => element("tspan", {x, dy: index ? leading : 0}, line, text));
+  }
+  function supportText(node) {
+    if (node.kind !== "FACT") return "";
+    const count = node.support_sources.length;
+    return `${count > 1 ? "Shared support" : "Support"}: ${node.active_edge_sources.length}/${count} active edges · ${node.support_sources.join(", ") || "none"}`;
+  }
+  function titleText(node) {
+    let text = `${node.kind} ${node.id} — ${node.note}`;
+    if (node.kind === "FACT") {
+      text += `\nRetained sources: ${node.support_sources.join(", ") || "none"}`;
+      text += `\nActive edge sources: ${node.active_edge_sources.join(", ") || "none"}`;
+      text += `\nRecorded active_support: ${node.recorded_active_support.join(", ") || "none"}`;
+    }
+    return text;
+  }
+  function setSelected(entity) {
+    selected = entity;
+    svg.querySelectorAll(".node").forEach(node => node.setAttribute("aria-pressed", String(node.dataset.entity === selected)));
+    relationships.querySelectorAll(".entity-button").forEach(node => node.setAttribute("aria-pressed", String(node.dataset.entity === selected)));
+  }
+  function htmlElement(tag, attributes, text, parent) {
+    const node = document.createElement(tag);
+    for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
+    if (text !== null) node.textContent = String(text);
+    parent.appendChild(node);
+    return node;
+  }
+  function entityButton(node, parent, full = false) {
+    const button = htmlElement("button", {type: "button", class: "entity-button", "data-entity": node.entity,
+      "aria-pressed": selected === node.entity, "aria-label": titleText(node), title: titleText(node)}, node.entity, parent);
+    button.disabled = disabled;
+    if (full) {
+      htmlElement("span", {}, node.note, button);
+      if (node.kind === "FACT") htmlElement("span", {}, supportText(node), button);
+    }
+    button.addEventListener("click", () => activate(node.entity)); // Native Enter/Space.
+  }
+  function drawTable() {
+    relationshipRows.replaceChildren(); entityList.replaceChildren();
+    const nodes = new Map(payload.nodes.map(node => [node.entity, node]));
+    payload.edges.forEach((edge, index) => {
+      const row = htmlElement("tr", {role: "row", "data-reference": index + 1}, null, relationshipRows);
+      const values = ["#" + (index + 1), edge.source_entity, edge.relation, edge.target_entity,
+        edge.active ? "Active" : "Retained inactive"];
+      ["Ref", "Source", "Relationship", "Target", "State"].forEach((label, column) => {
+        const cell = htmlElement("td", {role: "cell", "data-label": label}, null, row);
+        const endpoint = (column === 1 || column === 3) && nodes.get(values[column]);
+        if (endpoint) entityButton(endpoint, cell);
+        else htmlElement("span", {class: column === 0 ? "edge-reference-number" : column === 2 ? "relationship-type" : "edge-state"}, values[column], cell);
+      });
+    });
+    payload.nodes.forEach(node => entityButton(node, entityList, true));
+    document.getElementById("no-relationships").hidden = payload.edges.length > 0;
+  }
+  function activate(entity) {
+    if (disabled || !payload || !payload.nodes.some(node => node.entity === entity)) return;
+    const previousFact = disclosedFact();
+    const firstActivation = activatedEntity === null;
+    activatedEntity = entity;
+    setSelected(entity);
+    // Re-measure only when disclosure changes geometry. Other selections keep
+    // their DOM (and subtle halo transitions); no mount/layout animations.
+    if (firstActivation || previousFact !== disclosedFact()) draw();
+    // Wall-clock seed avoids restarting small counters on iframe remounts.
+    sequence = Math.max(sequence + 1, Date.now() * 1000);
+    send("setComponentValue", {dataType: "json", value: {entity, context, sequence}});
+  }
+  function disclosedFact() {
+    return selected === activatedEntity && payload?.nodes.some(node => node.entity === selected && node.kind === "FACT")
+      ? selected : null;
+  }
+  function camera(resetScroll = false) {
+    const available = availableWidth();
+    if (cameraMode === "fit" && !viewport.hidden) scale = Math.min(1, available / width, viewport.clientHeight / height);
+    // Default labels stay at readable native size. Overflow is local scroll;
+    // only an explicit Fit/zoom action may shrink text.
+    if (cameraMode === "auto") scale = 1;
+    svg.setAttribute("width", width * scale);
+    svg.setAttribute("height", height * scale);
+    zoomOutput.textContent = `${Math.round(scale * 100)}%`;
+    const inactive = disabled || !payload || !payload.nodes.length;
+    fit.disabled = inactive;
+    zoomIn.disabled = inactive || scale >= 3;
+    zoomOut.disabled = inactive || scale <= .2;
+    if (resetScroll) { viewport.scrollLeft = 0; viewport.scrollTop = 0; }
+    frameHeight();
+  }
+  function zoom(factor) {
+    if (!payload || !payload.nodes.length || disabled) return;
+    const centerX = (viewport.scrollLeft + viewport.clientWidth / 2) / scale;
+    const centerY = (viewport.scrollTop + viewport.clientHeight / 2) / scale;
+    cameraMode = "manual"; scale = Math.max(.2, Math.min(3, scale * factor));
+    camera();
+    viewport.scrollLeft = Math.max(0, centerX * scale - viewport.clientWidth / 2);
+    viewport.scrollTop = Math.max(0, centerY * scale - viewport.clientHeight / 2);
+  }
+  fit.addEventListener("click", () => { cameraMode = "fit"; camera(true); });
+  zoomIn.addEventListener("click", () => zoom(1.25));
+  zoomOut.addEventListener("click", () => zoom(1 / 1.25));
+  graphView.addEventListener("click", () => { viewChoice = "graph"; draw(); });
+  tableView.addEventListener("click", () => { viewChoice = "table"; draw(); });
+  document.querySelectorAll("details").forEach(detail => detail.addEventListener("toggle", frameHeight));
+  parentMobile?.addEventListener("change", () => draw());
+
+  function draw(resetCamera = false) {
+    updateView();
+    if (!payload) { frameHeight(); return; }
+    const focusedElement = document.activeElement;
+    const focused = focusedElement?.dataset.entity;
+    const focusedInGraph = svg.contains(focusedElement);
+    const scroll = [viewport.scrollLeft, viewport.scrollTop];
+    svg.replaceChildren();
+    drawTable();
+    const hasNodes = payload.nodes.length > 0;
+    empty.hidden = hasNodes; svg.toggleAttribute("hidden", !hasNodes);
+    empty.textContent = "No entities exist in this snapshot.";
+    if (!hasNodes) { viewport.style.height = "480px"; camera(true); return; }
+
+    // Native-size typography at desktop widths, not an 840px drawing clipped
+    // inside a narrower viewport. Mobile defaults to the table; its explicit
+    // Graph option keeps a readable 650px canvas with local horizontal scroll.
+    width = Math.max(650, availableWidth());
+    const gutter = 76, padding = 18;
+    const columnWidth = (width - padding * 2 - gutter * 2) / 3;
+    const labelWidth = columnWidth - 12;
+    const layouts = payload.nodes.map(node => {
+      const labels = wrap(node.id, labelWidth, 15, true);
+      const notes = wrap(node.note, labelWidth, 13);
+      const supports = node.entity === disclosedFact() ? wrap(supportText(node), labelWidth, 13) : [];
+      return {node, labels, notes, supports, textHeight: labels.length * 20 + (notes.length + supports.length) * 18};
+    });
+    const positions = new Map();
+    const kinds = ["SOURCE", "FACT", "SUMMARY"];
+    // Keep the projection's lane/row ordering. Allocate complete label boxes,
+    // then distribute surplus space per lane rather than shrinking the font.
+    const lanes = kinds.map(kind => layouts.filter(item => item.node.kind === kind).sort((a, b) => a.node.y - b.node.y));
+    height = Math.max(480, ...lanes.map(lane => 100 + lane.reduce((sum, item) => sum + item.textHeight + 100, 0)),
+      140 + payload.edges.length * 32);
+    lanes.forEach((lane, column) => {
+      const used = lane.reduce((sum, item) => sum + item.textHeight + 100, 0);
+      const spare = (height - 100 - used) / Math.max(1, lane.length);
+      let cursor = 92;
+      lane.forEach(item => {
+        item.x = padding + columnWidth / 2 + column * (columnWidth + gutter);
+        item.y = cursor + spare / 2;
+        positions.set(item.node.entity, item);
+        cursor += item.textHeight + 100 + spare;
+      });
+      element("text", {x: padding + columnWidth / 2 + column * (columnWidth + gutter), y: 26,
+        class: "heading", "text-anchor": "middle"}, kinds[column] === "SUMMARY" ? "SUMMARIES" : kinds[column] + "S");
+    });
+    // Both built-in fixtures get their *entire* native-height SVG, including
+    // the final support line and focus ring. Only synthetic dense cases scroll.
+    const dense = payload.nodes.length > 18 || payload.edges.length > 32;
+    viewport.style.height = `${dense ? Math.min(height, 960) : height}px`;
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    const defs = element("defs");
+    const edgeLanes = new Map();
+    payload.edges.forEach((edge, index) => {
+      const a = positions.get(edge.source_entity), b = positions.get(edge.target_entity);
+      if (!a || !b) return;
+      const key = `${a.node.kind}:${b.node.kind}`;
+      if (!edgeLanes.has(key)) edgeLanes.set(key, []);
+      edgeLanes.get(key).push({edge, index, a, b});
+    });
+    const references = new Map();
+    edgeLanes.forEach(lane => {
+      const x = (lane[0].a.x + lane[0].b.x) / 2;
+      const relations = [...new Set(lane.map(item => item.edge.relation))];
+      // Keep #refs at rest; disclose actual lane types only after activation.
+      if (activatedEntity !== null) {
+        const heading = wrap(relations.join(" · "), columnWidth + gutter - 12, 13);
+        textLines(svg, heading, x, 50, "lane-relation");
+      }
+      lane.forEach((item, row) => references.set(item.index, {x, rail: row * 8 / Math.max(1, lane.length - 1),
+        y: 94 + row * (height - 144) / Math.max(1, lane.length - 1)}));
+    });
+    payload.edges.forEach((edge, index) => {
+      const a = positions.get(edge.source_entity), b = positions.get(edge.target_entity);
+      if (!a || !b) return;
+      const color = edge.active && a.node.affected && b.node.affected ? "#D5AE65" : "#A9B5AE";
+      const markerId = `arrow-${index}`;
+      const marker = element("marker", {id: markerId, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse", markerUnits: "userSpaceOnUse"}, null, defs);
+      element("path", {d: "M 0 0 L 10 5 L 0 10 z", fill: color}, null, marker);
+      const group = element("g", {class: "edge", "data-active": edge.active, "data-reference": index + 1,
+        "data-relation": edge.relation, role: "img", "aria-label": `#${index + 1}: ${edge.source_entity} → ${edge.relation} → ${edge.target_entity}; ${edge.active ? "active" : "retained inactive"}`});
+      element("title", {}, `${edge.source_entity} → ${edge.target_entity}\n${edge.relation} — ${edge.active ? "active" : "retained inactive"}`, group);
+      const {x: labelX, y: labelY, rail} = references.get(index);
+      const reference = `#${index + 1}`;
+      measure.font = "12px system-ui, sans-serif";
+      const chipWidth = Math.max(32, measure.measureText(reference).width + 12);
+      // Reserve the center strip for chips. Vertical rails stay outside it,
+      // so later paths cannot cross another edge's label, even at convergence.
+      const leftRail = labelX - gutter / 2 + 4 + rail, rightRail = labelX + gutter / 2 - 4 - rail;
+      const d = `M ${a.x + 24} ${a.y} H ${leftRail} V ${labelY} H ${rightRail} V ${b.y} H ${b.x - 28}`;
+      element("path", {d, fill: "none", stroke: color, "stroke-width": 1.7,
+        "stroke-dasharray": edge.active ? "none" : "6 4", "marker-end": `url(#${markerId})`}, null, group);
+      element("rect", {x: labelX - chipWidth / 2, y: labelY - 11, width: chipWidth, height: 22, rx: 5, class: "edge-chip"}, null, group);
+      element("text", {x: labelX, y: labelY + 4, class: "edge-label", "text-anchor": "middle"}, reference, group);
+    });
+    for (const item of layouts) {
+      const {node, x, y, labels, notes, supports} = item;
+      const group = element("g", {class: "node", transform: `translate(${x} ${y})`, role: "button", tabindex: disabled ? -1 : 0,
+        "data-entity": node.entity, "data-affected": node.affected, "aria-pressed": selected === node.entity,
+        "aria-disabled": disabled, "aria-label": titleText(node)});
+      element("title", {}, titleText(node), group);
+      const box = {x: -labelWidth / 2 - 6, y: -30, width: labelWidth + 12, height: item.textHeight + 76};
+      element("rect", {...box, rx: 6, fill: "transparent"}, null, group);
+      element("rect", {...box, rx: 6, class: "focus-ring"}, null, group);
+      element("circle", {r: 28, class: "halo"}, null, group);
+      // The projection's MISMATCH annotation is evidence; status alone is not.
+      const mismatch = /(?:^|\s\/\s)MISMATCH\b/.test(node.note);
+      const style = {fill: mismatch ? "#51312F" : "#303D35", stroke: mismatch ? "#E49B96" : "#A9B5AE", "stroke-width": 2};
+      if (node.shape === "square") element("rect", {x: -19, y: -19, width: 38, height: 38, rx: 2, ...style}, null, group);
+      else if (node.shape === "diamond") element("polygon", {points: "0,-23 23,0 0,23 -23,0", ...style}, null, group);
+      else element("circle", {r: 20, ...style}, null, group);
+      let ty = 46;
+      textLines(group, labels, 0, ty, "label", "middle", 20); ty += labels.length * 20;
+      textLines(group, notes, 0, ty, "note"); ty += notes.length * 18;
+      if (supports.length) textLines(group, supports, 0, ty, "support");
+      group.addEventListener("click", () => activate(node.entity));
+      group.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault(); if (!event.repeat) activate(node.entity);
+        }
+      });
+    }
+    camera(resetCamera);
+    if (!resetCamera) { viewport.scrollLeft = scroll[0]; viewport.scrollTop = scroll[1]; }
+    if (focused && !resetCamera) {
+      const candidates = focusedInGraph ? svg.querySelectorAll(".node") : relationships.querySelectorAll(".entity-button");
+      const target = [...candidates].find(node => node.dataset.entity === focused);
+      target?.focus({preventScroll: true});
+    }
+  }
+
+  window.addEventListener("message", event => {
+    // Streamlit render messages have type/args; the marker is for outbound traffic.
+    if (event.source !== window.parent || event.data?.type !== "streamlit:render") return;
+    const next = event.data.args?.payload;
+    if (!next || typeof next.context !== "string" || !Array.isArray(next.nodes) || !Array.isArray(next.edges)) return;
+    const changed = context !== next.context;
+    if (changed) { context = next.context; cameraMode = "auto"; scale = 1; activatedEntity = null; }
+    if (changed || next.selected !== serverSelected) selected = next.selected;
+    if (!next.nodes.some(node => node.entity === selected)) selected = null;
+    if (!next.nodes.some(node => node.entity === activatedEntity)) activatedEntity = null;
+    serverSelected = next.selected; payload = next; disabled = event.data.disabled === true;
+    draw(changed);
+  });
+  new ResizeObserver(() => {
+    const nextWidth = availableWidth();
+    if (nextWidth !== lastWidth) { lastWidth = nextWidth; draw(); }
+    frameHeight();
+  }).observe(main);
+  updateView();
+  send("componentReady", {apiVersion: 1});
+  frameHeight();
+})();
+</script>
+</body>
+</html>
